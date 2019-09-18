@@ -8,6 +8,9 @@ final case class Next(before: Num) extends Num
 final case class Prev(after: Num) extends Num
 
 object Num {
+  def apply(i: Int): Num =
+    if (i == 0) Zero else if (i > 0) Next(Num(i - 1)) else Prev(Num(i + 1))
+
   val one: Num = Next(Zero)
   val negOne: Num = Prev(Zero)
 
