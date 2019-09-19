@@ -18,10 +18,6 @@ class ArithmeticSuite extends FlatSpec with Matchers{
     digitParser.parse("hello5") shouldBe Failure
   }
 
-  "tensParser" should "parse 20" in {
-    tensParser.parse("20") shouldBe Success(20, "")
-  }
-
   "plusExprParser" should "parse 1+2" in {
     plusExprParser.parse("1+2") shouldBe Success(Add(Number(Num(1)), Number(Num(2))), "")
   }
@@ -36,5 +32,17 @@ class ArithmeticSuite extends FlatSpec with Matchers{
 
   it should "parse (1*2)*3" in {
     multiplyExprParser.parse("(1*2)*3") shouldBe Success(Multiply(Multiply(Number(Num(1)), Number(Num(2))), Number(Num(3))), "")
+  }
+
+  it should "parse (5+27)*3" in {
+    multiplyExprParser.parse("(5+27)*3") shouldBe Success(Multiply(Add(Number(Num(5)), Number(Num(27))), Number(Num(3))), "")
+  }
+
+  "numberParser" should "parse 12" in {
+    numberParser.parse("12") shouldBe Success(Number(Num(12)), "")
+  }
+
+  it should "parse 999" in {
+    numberParser.parse("999") shouldBe Success(Number(Num(999)), "")
   }
 }

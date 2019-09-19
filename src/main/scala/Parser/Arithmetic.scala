@@ -2,6 +2,8 @@ package Parser
 
 import Num._
 
+import scala.annotation.tailrec
+
 object Arithmetic {
   type Prog[A] = () => A
 
@@ -60,6 +62,7 @@ object Arithmetic {
     def |(that: => Parser[A]): Parser[A] = new Or(this, that)
     def ~[B](that: => Parser[B]): Parser[(A, B)] = new And(this, that)
     def map[B](f: A => B): Parser[B] = Map(this, f)
+    def rep: Parser[Seq[A]] = Rep(this)
   }
 
   object Parser {
@@ -95,14 +98,26 @@ object Arithmetic {
         case _ => Failure
       }
     }
+    final case class Rep[A](p: Parser[A]) extends Parser[Seq[A]] {
+      override def parse(s: String): Result[Seq[A]] = {
+        @tailrec
+        def looper(acc: Seq[A], currStr: String): (Seq[A], String) = p.parse(currStr) match {
+          case Success(a, remaining) => looper(a +: acc, remaining)
+          case Failure => (acc, currStr)
+        }
+        looper(Seq(), s) match {
+          case (Seq(), _) => Failure
+          case (as, str) => Success(as.reverse, str)
+        }
+      }
+    }
 
     val digitParser: Parser[Char] = Text('0') | Text('1') | Text('2') | Text('3') | Text('4') | Text('5') | Text('6') | Text('7') | Text('8') | Text('9')
     val smallNumberParser: Parser[Expr] = digitParser.map(i => Number(Num(i.toString.toInt)))
-    def plusExprParser: Parser[Expr] = (parened | smallNumberParser) ~ Text('+') ~ (parened | smallNumberParser) map { case ((l, _), r) => Add(l, r)}
-    def multiplyExprParser: Parser[Expr] = (parened | smallNumberParser) ~ Text('*') ~ (parened | smallNumberParser) map { case ((l, _), r) => Multiply(l, r)}
+    val numberParser: Parser[Expr] = digitParser.rep.map(chars => Number(Num(chars.map(_.toString).reduce(_ + _).toInt)))
+    def plusExprParser: Parser[Expr] = (parened | numberParser) ~ Text('+') ~ (parened | numberParser) map { case ((l, _), r) => Add(l, r)}
+    def multiplyExprParser: Parser[Expr] = (parened | numberParser) ~ Text('*') ~ (parened | numberParser) map { case ((l, _), r) => Multiply(l, r)}
     def parened: Parser[Expr] = Text('(') ~ exprParser ~ Text(')') map{ case ((_, e), _) => e}
-    def exprParser: Parser[Expr] = multiplyExprParser | plusExprParser | smallNumberParser
-    //
-    val tensParser: Parser[Int] = digitParser.~(digitParser).map{ case (first, second) => (first.toString + second.toString).toInt }
+    def exprParser: Parser[Expr] = multiplyExprParser | plusExprParser | numberParser
   }
 }
