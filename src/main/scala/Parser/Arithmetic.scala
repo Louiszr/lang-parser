@@ -57,8 +57,8 @@ object Arithmetic {
     import Parser._
 
     def parse(s: String): Result[A]
-    def or(that: => Parser[A]): Parser[A] = new Or(this, that)
-    def and[B](that: => Parser[B]): Parser[(A, B)] = new And(this, that)
+    def |(that: => Parser[A]): Parser[A] = new Or(this, that)
+    def ~[B](that: => Parser[B]): Parser[(A, B)] = new And(this, that)
     def map[B](f: A => B): Parser[B] = Map(this, f)
   }
 
@@ -96,13 +96,13 @@ object Arithmetic {
       }
     }
 
-    val digitParser: Parser[Char] = Text('0') or Text('1') or Text('2') or Text('3') or Text('4') or Text('5') or Text('6') or Text('7') or Text('8') or Text('9')
+    val digitParser: Parser[Char] = Text('0') | Text('1') | Text('2') | Text('3') | Text('4') | Text('5') | Text('6') | Text('7') | Text('8') | Text('9')
     val smallNumberParser: Parser[Expr] = digitParser.map(i => Number(Num(i.toString.toInt)))
-    def plusExprParser: Parser[Expr] = smallNumberParser and Text('+') and exprParser map { case ((l, _), r) => Add(l, r)}
-    def multiplyExprParser: Parser[Expr] = smallNumberParser and Text('*') and exprParser map { case ((l, _), r) => Multiply(l, r)}
-//    def parened: Parser[Expr] = Text('(') and exprParser and Text(')') map{ case ((_, e), _) => e}
-    def exprParser: Parser[Expr] = multiplyExprParser or plusExprParser or smallNumberParser
+    def plusExprParser: Parser[Expr] = (parened | smallNumberParser) ~ Text('+') ~ (parened | smallNumberParser) map { case ((l, _), r) => Add(l, r)}
+    def multiplyExprParser: Parser[Expr] = (parened | smallNumberParser) ~ Text('*') ~ (parened | smallNumberParser) map { case ((l, _), r) => Multiply(l, r)}
+    def parened: Parser[Expr] = Text('(') ~ exprParser ~ Text(')') map{ case ((_, e), _) => e}
+    def exprParser: Parser[Expr] = multiplyExprParser | plusExprParser | smallNumberParser
     //
-    val tensParser: Parser[Int] = digitParser.and(digitParser).map{ case (first, second) => (first.toString + second.toString).toInt }
+    val tensParser: Parser[Int] = digitParser.~(digitParser).map{ case (first, second) => (first.toString + second.toString).toInt }
   }
 }

@@ -26,15 +26,15 @@ class ArithmeticSuite extends FlatSpec with Matchers{
     plusExprParser.parse("1+2") shouldBe Success(Add(Number(Num(1)), Number(Num(2))), "")
   }
 
-  it should "parse 1+2+3" in {
-    plusExprParser.parse("1+2+3") shouldBe Success(Add(Number(Num(1)), Add(Number(Num(2)), Number(Num(3)))), "")
+  it should "parse 1+(2+3)" in {
+    plusExprParser.parse("1+(2+3)") shouldBe Success(Add(Number(Num(1)), Add(Number(Num(2)), Number(Num(3)))), "")
   }
 
   "multiplyExprParser" should "parse 5*6" in {
     multiplyExprParser.parse("5*6") shouldBe Success(Multiply(Number(Num(5)), Number(Num(6))), "")
   }
 
-  it should "parse 1*2*3" in {
-    multiplyExprParser.parse("1*2*3") shouldBe Success(Multiply(Number(Num(1)), Multiply(Number(Num(2)), Number(Num(3)))), "")
+  it should "parse (1*2)*3" in {
+    multiplyExprParser.parse("(1*2)*3") shouldBe Success(Multiply(Multiply(Number(Num(1)), Number(Num(2))), Number(Num(3))), "")
   }
 }
