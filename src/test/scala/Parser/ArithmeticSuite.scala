@@ -45,4 +45,48 @@ class ArithmeticSuite extends FlatSpec with Matchers{
   it should "parse 999" in {
     numberParser.parse("999") shouldBe Success(Number(Num(999)), "")
   }
+
+  "Split" should "parse 123 and + sign" in {
+    new Split(Pure(("123", "+")), numberParser, Text('+')).parse("") shouldBe Success((Number(Num(123)), '+'), "")
+  }
+
+  "At" should "parse 123+456 as (123, 456)" in {
+    Sep('+').parse("123+456") shouldBe Success(("123", "456"), "")
+  }
+
+  it should "parse (123+456)+789 as ((123+456), 789)" in {
+    Sep('+').parse("(123+456)+789") shouldBe Success(("(123+456)", "789"), "")
+  }
+
+  "exprParser" should "parse 1*2+3*4" in {
+    exprParser.parse("1*2+3*4") shouldBe Success(
+      Add(
+        Multiply(
+          Number(Num(1)),
+          Number(Num(2))
+        ),
+        Multiply(
+          Number(Num(3)),
+          Number(Num(4))
+        )
+      ),
+      ""
+    )
+  }
+
+  it should "parse 1+(2+1)*3" in {
+    exprParser.parse("1+(2+1)*3") shouldBe Success(
+      Add(
+        Number(Num(1)),
+        Multiply(
+          Add(
+            Number(Num(2)),
+            Number(Num(1))
+          ),
+          Number(Num(3))
+        )
+      ),
+      ""
+    )
+  }
 }

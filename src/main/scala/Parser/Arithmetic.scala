@@ -9,11 +9,13 @@ object Arithmetic {
 
   sealed trait Expr {
     import Expr._
-    def repr: String = this match {
-      case Number(i) => i.toString
-      case Add(l, r) => s"(${l.repr} + ${r.repr})"
-      case Multiply(l, r) => s"(${l.repr} * ${r.repr})"
-    }
+
+    // TODO: Add case for If; Fix Number case
+//    def repr: String = this match {
+//      case Number(i) => i.toString
+//      case Add(l, r) => s"(${l.repr} + ${r.repr})"
+//      case Multiply(l, r) => s"(${l.repr} * ${r.repr})"
+//    }
   }
 
   object Expr {
@@ -49,6 +51,7 @@ object Arithmetic {
 
 
   sealed trait Result[+A]
+
   object Result {
     final case class Success[A](a: A, remaining: String) extends Result[A]
     case object Failure extends Result[Nothing]
@@ -61,8 +64,9 @@ object Arithmetic {
     def parse(s: String): Result[A]
     def |(that: => Parser[A]): Parser[A] = new Or(this, that)
     def ~[B](that: => Parser[B]): Parser[(A, B)] = new And(this, that)
-    def map[B](f: A => B): Parser[B] = Map(this, f)
+    def map[B](f: A => B): Parser[B] = flatMap(a => Pure(f(a)))
     def rep: Parser[Seq[A]] = Rep(this)
+    def flatMap[B](f: A => Parser[B]): Parser[B] = FlatMap(this, f)
   }
 
   object Parser {
@@ -77,12 +81,14 @@ object Arithmetic {
         } yield Success(h, s.tail)
         }.getOrElse(Failure)
     }
+
     class Or[A](l: Parser[A], r: => Parser[A]) extends Parser[A] {
       override def parse(s: String): Result[A] = l.parse(s) match {
         case s @ Success(_, _) => s
         case Failure => r.parse(s)
       }
     }
+
     class And[A, B](l: Parser[A], r: => Parser[B]) extends Parser[(A, B)] {
       override def parse(s: String): Result[(A, B)] = l.parse(s) match {
         case Success(a, s1) => r.parse(s1) match {
@@ -92,12 +98,14 @@ object Arithmetic {
         case _ => Failure
       }
     }
+
     final case class Map[A, B](p: Parser[A], f: A => B) extends Parser[B] {
       override def parse(s: String): Result[B] = p.parse(s) match {
         case Success(a, remaining) => Success(f(a), remaining)
         case _ => Failure
       }
     }
+
     final case class Rep[A](p: Parser[A]) extends Parser[Seq[A]] {
       override def parse(s: String): Result[Seq[A]] = {
         @tailrec
@@ -112,12 +120,62 @@ object Arithmetic {
       }
     }
 
+    final case class FlatMap[A, B](p: Parser[A], f: A => Parser[B]) extends Parser[B] {
+      override def parse(s: String): Result[B] = p.parse(s) match {
+        case Success(a, remaining) => f(a).parse(remaining)
+        case Failure => Failure
+      }
+    }
+
+    final case class Set(v: String) extends Parser[Unit] {
+      override def parse(s: String): Result[Unit] = Success((), v)
+    }
+
+    final case class Pure[A](res: A) extends Parser[A] {
+      override def parse(s: String): Result[A] = Success(res, s)
+    }
+
+    class Split[A, B](at: Parser[(String, String)], parseBefore: => Parser[A], parseAfter: => Parser[B]) extends Parser[(A, B)] {
+      override def parse(s: String): Result[(A, B)] = {
+        for {
+          halves <- at // res: (b, a) remaining: ""
+          _ <- Set(halves._1)
+          resBefore <- parseBefore // res: resBefore remaining: ""
+          _ <- Set(halves._2)
+          resAfter <- parseAfter // res: resAfter remaining ""
+        } yield (resBefore, resAfter)
+      }.parse(s)
+    }
+
+    final case class Sep(t: Char) extends Parser[(String, String)] {
+      def isParenClosed(str: String): Boolean = {
+        @tailrec
+        def looper(remaining: String, accParenCount: Int): Int =
+          if (remaining.isEmpty) accParenCount
+          else if (remaining.head == '(') looper(remaining.tail, accParenCount + 1)
+          else if (remaining.head == ')') looper(remaining.tail, accParenCount - 1)
+          else looper(remaining.tail, accParenCount)
+
+        looper(str, 0) == 0
+      }
+
+      override def parse(s: String): Result[(String, String)] = {
+        @tailrec
+        def cut(i: Int): Result[(String, String)] = if (i >= s.length) Failure else {
+          val indOfT = s.indexOf(t.toString, i)
+          val (head, tail) = s.splitAt(indOfT)
+          if (!isParenClosed(head)) cut(head.length + 1) else Success((head, tail.tail), "")
+        }
+
+        cut(0)
+      }
+    }
+
     val digitParser: Parser[Char] = Text('0') | Text('1') | Text('2') | Text('3') | Text('4') | Text('5') | Text('6') | Text('7') | Text('8') | Text('9')
-    val smallNumberParser: Parser[Expr] = digitParser.map(i => Number(Num(i.toString.toInt)))
     val numberParser: Parser[Expr] = digitParser.rep.map(chars => Number(Num(chars.map(_.toString).reduce(_ + _).toInt)))
-    def plusExprParser: Parser[Expr] = (parened | numberParser) ~ Text('+') ~ (parened | numberParser) map { case ((l, _), r) => Add(l, r)}
-    def multiplyExprParser: Parser[Expr] = (parened | numberParser) ~ Text('*') ~ (parened | numberParser) map { case ((l, _), r) => Multiply(l, r)}
+    def plusExprParser: Parser[Expr] = new Split(Sep('+'), exprParser, exprParser) map {case (l, r) => Add(l, r)}
+    def multiplyExprParser: Parser[Expr] = new Split(Sep('*'), exprParser, exprParser) map {case (l, r) => Multiply(l, r)}
     def parened: Parser[Expr] = Text('(') ~ exprParser ~ Text(')') map{ case ((_, e), _) => e}
-    def exprParser: Parser[Expr] = multiplyExprParser | plusExprParser | numberParser
+    def exprParser: Parser[Expr] = plusExprParser | multiplyExprParser | parened | numberParser
   }
 }
