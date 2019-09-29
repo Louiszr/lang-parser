@@ -4,6 +4,7 @@ import org.scalatest.{FlatSpec, Matchers}
 import Arithmetic.Parser._
 import Arithmetic.Result._
 import Arithmetic.Expr._
+import Arithmetic.Scope._
 
 class ArithmeticSuite extends FlatSpec with Matchers{
   "digitParser" should "parse 0" in {
@@ -88,5 +89,29 @@ class ArithmeticSuite extends FlatSpec with Matchers{
       ),
       ""
     )
+  }
+
+  "eval" should "limit scope when using ShadowScope" in {
+    val expr =
+      Assign("x", Number(Num(1))) block
+        Assign("y",
+          Assign("x", Number(Num(3))) block
+            Add(Var("x"), Var("x"))
+        ) block
+        Add(Var("x"), Var("y"))
+
+    eval(expr, emptyLocalScope)._1 shouldBe Num(7)
+  }
+
+  "evalEager" should "use a global scope when using GlobalScope" in {
+    val expr =
+      Assign("x", Number(Num(1))) block
+        Assign("y",
+          Assign("x", Number(Num(3))) block
+            Add(Var("x"), Var("x"))
+        ) block
+        Add(Var("x"), Var("y"))
+
+    evalEager(expr, emptyGlobalScope)._1 shouldBe Num(9)
   }
 }

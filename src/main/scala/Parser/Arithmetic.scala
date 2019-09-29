@@ -16,18 +16,58 @@ object Arithmetic {
 //      case Add(l, r) => s"(${l.repr} + ${r.repr})"
 //      case Multiply(l, r) => s"(${l.repr} * ${r.repr})"
 //    }
+
+    def block(that: Expr) = Block(this, that)
   }
 
   object Expr {
-    def eval(e: Expr): Num = e match {
-      case Number(i) => i
-      case Add(l, r) => add(eval(l), eval(r))
-      case Multiply(l, r) => multiply(eval(l), eval(r))
+    def eval(e: Expr, scope: Scope): (Num, Scope) = e match {
+      // lazy local
+      case Number(i) => (i, scope)
+      case Add(l, r) => (add(eval(l, scope.passed)._1, eval(r, scope.passed)._1), scope)
+      case Multiply(l, r) => (multiply(eval(l, scope.passed)._1, eval(r, scope.passed)._1), scope)
       case If(cond, thenDo, elseDo) =>
-        if (gt(eval(cond), Zero)) eval(thenDo) else eval(elseDo)
+        if (gt(eval(cond, scope.passed)._1, Zero)) eval(thenDo, scope.passed) else eval(elseDo, scope.passed)
+      // TODO: Assign should not return a Num
+      case Assign(n, v) => (Zero, scope.add(n, v))
+//        val (num, scope1) = eval(v, scope.passed)
+//        (Zero, scope1.add(n, Number(num)))
+      // TODO: Var should return undefined
+      case Var(n) => scope.getOption(n)
+        .map(expr => eval(expr, scope.passed))
+        .getOrElse((Zero, scope))
+      case Block(first, second) =>
+        val (_, scope1) = eval(first, scope.passed)
+        eval(second, scope1)
+    }
+
+    def evalEager(e: Expr, scope: Scope): (Num, Scope) = e match {
+      // eager global
+      case Number(i) => (i, scope)
+      case Add(l, r) =>
+        val (lVal, scope1) = evalEager(l, scope.passed)
+        val (rVal, scope2) = evalEager(r, scope1)
+        (add(lVal, rVal), scope2)
+      case Multiply(l, r) =>
+        val (lVal, scope1) = evalEager(l, scope.passed)
+        val (rVal, scope2) = evalEager(r, scope1)
+        (multiply(lVal, rVal), scope2)
+      case If(cond, thenDo, elseDo) =>
+        val (condVal, scope1) = evalEager(cond, scope.passed)
+        if (gt(condVal, Zero)) evalEager(thenDo, scope1) else evalEager(elseDo, scope1)
+      case Assign(n, v) =>
+        val (num, scope1) = evalEager(v, scope.passed)
+        (Zero, scope1.add(n, Number(num)))
+      case Var(n) => scope.getOption(n)
+        .map(expr => evalEager(expr, scope.passed))
+        .getOrElse((Zero, scope))
+      case Block(first, second) =>
+        val (_, scope1) = evalEager(first, scope.passed)
+        evalEager(second, scope1)
     }
 
     def compile(e: Expr): Prog[Num] = e match {
+      // TODO: Match not exhaustive
       case Number(i) => () => i
       case Add(l, r) =>
         val lComp = compile(l)
@@ -47,8 +87,40 @@ object Arithmetic {
     final case class Add(l: Expr, r: Expr) extends Expr
     final case class Multiply(l: Expr, r: Expr) extends Expr
     final case class If(cond: Expr, thenDo: Expr, elseDo: Expr) extends Expr
+    final case class Assign(n: String, v: Expr) extends Expr
+    final case class Var(n: String) extends Expr
+    final case class Block(first: Expr, second: Expr) extends Expr
   }
 
+  sealed trait Scope {
+    def register: Map[String, Expr]
+    def getOption(k: String): Option[Expr]
+    def add(k: String, v: Expr): Scope
+    def passed: Scope
+  }
+
+  object Scope {
+    val emptyLocalScope: LocalScope = LocalScope(Map.empty[String, Expr], None)
+
+    val emptyGlobalScope: GlobalScope = GlobalScope(Map.empty[String, Expr])
+
+    final case class LocalScope(register: Map[String, Expr], calledFrom: Option[LocalScope]) extends Scope {
+      override def getOption(k: String): Option[Expr] = register.get(k).orElse(calledFrom.flatMap(_.getOption(k)))
+
+      override def add(k: String, v: Expr): Scope = this.copy(register = this.register + (k -> v))
+
+      override def passed: Scope = LocalScope(Map.empty[String, Expr], Some(this))
+    }
+
+    final case class GlobalScope(register: Map[String, Expr]) extends Scope {
+      override def getOption(k: String): Option[Expr] = register.get(k)
+
+      override def add(k: String, v: Expr): Scope = this.copy(register = this.register + (k -> v))
+
+      override def passed: Scope = this
+    }
+
+  }
 
   sealed trait Result[+A]
 
