@@ -29,9 +29,7 @@ object Arithmetic {
       case If(cond, thenDo, elseDo) =>
         if (gt(eval(cond, scope.passed)._1, Zero)) eval(thenDo, scope.passed) else eval(elseDo, scope.passed)
       // TODO: Assign should not return a Num
-      case Assign(n, v) => (Zero, scope.add(n, v))
-//        val (num, scope1) = eval(v, scope.passed)
-//        (Zero, scope1.add(n, Number(num)))
+      case Assign(n, v) => (Zero, scope.define(n, v))
       // TODO: Var should return undefined
       case Var(n) => scope.getOption(n)
         .map(expr => eval(expr, scope.passed))
@@ -57,7 +55,7 @@ object Arithmetic {
         if (gt(condVal, Zero)) evalEager(thenDo, scope1) else evalEager(elseDo, scope1)
       case Assign(n, v) =>
         val (num, scope1) = evalEager(v, scope.passed)
-        (Zero, scope1.add(n, Number(num)))
+        (Zero, scope1.define(n, Number(num)))
       case Var(n) => scope.getOption(n)
         .map(expr => evalEager(expr, scope.passed))
         .getOrElse((Zero, scope))
@@ -66,23 +64,23 @@ object Arithmetic {
         evalEager(second, scope1)
     }
 
-    def compile(e: Expr): Prog[Num] = e match {
-      // TODO: Match not exhaustive
-      case Number(i) => () => i
-      case Add(l, r) =>
-        val lComp = compile(l)
-        val rComp = compile(r)
-        () => add(lComp(), rComp())
-      case Multiply(l, r) =>
-        val lComp = compile(l)
-        val rComp = compile(r)
-        () => multiply(lComp(), rComp())
-      case If(cond, thenDo, elseDo) =>
-        val condComp = compile(cond)
-        val thenDoComp = compile(thenDo)
-        val elseDoComp = compile(elseDo)
-        () => if (gt(condComp(), Zero)) thenDoComp() else elseDoComp()
-    }
+//    def compile(e: Expr): Prog[Num] = e match {
+//      // TODO: Match not exhaustive
+//      case Number(i) => () => i
+//      case Add(l, r) =>
+//        val lComp = compile(l)
+//        val rComp = compile(r)
+//        () => add(lComp(), rComp())
+//      case Multiply(l, r) =>
+//        val lComp = compile(l)
+//        val rComp = compile(r)
+//        () => multiply(lComp(), rComp())
+//      case If(cond, thenDo, elseDo) =>
+//        val condComp = compile(cond)
+//        val thenDoComp = compile(thenDo)
+//        val elseDoComp = compile(elseDo)
+//        () => if (gt(condComp(), Zero)) thenDoComp() else elseDoComp()
+//    }
     final case class Number(i: Num) extends Expr
     final case class Add(l: Expr, r: Expr) extends Expr
     final case class Multiply(l: Expr, r: Expr) extends Expr
@@ -95,7 +93,7 @@ object Arithmetic {
   sealed trait Scope {
     def register: Map[String, Expr]
     def getOption(k: String): Option[Expr]
-    def add(k: String, v: Expr): Scope
+    def define(k: String, v: Expr): Scope
     def passed: Scope
   }
 
@@ -107,7 +105,7 @@ object Arithmetic {
     final case class LocalScope(register: Map[String, Expr], calledFrom: Option[LocalScope]) extends Scope {
       override def getOption(k: String): Option[Expr] = register.get(k).orElse(calledFrom.flatMap(_.getOption(k)))
 
-      override def add(k: String, v: Expr): Scope = this.copy(register = this.register + (k -> v))
+      override def define(k: String, v: Expr): Scope = this.copy(register = this.register + (k -> v))
 
       override def passed: Scope = LocalScope(Map.empty[String, Expr], Some(this))
     }
@@ -115,7 +113,7 @@ object Arithmetic {
     final case class GlobalScope(register: Map[String, Expr]) extends Scope {
       override def getOption(k: String): Option[Expr] = register.get(k)
 
-      override def add(k: String, v: Expr): Scope = this.copy(register = this.register + (k -> v))
+      override def define(k: String, v: Expr): Scope = this.copy(register = this.register + (k -> v))
 
       override def passed: Scope = this
     }
