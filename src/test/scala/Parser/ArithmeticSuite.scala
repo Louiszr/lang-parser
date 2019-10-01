@@ -114,4 +114,30 @@ class ArithmeticSuite extends FlatSpec with Matchers{
 
     evalEager(expr, emptyGlobalScope)._1 shouldBe Num(9)
   }
+
+  "Apply" should "apply lambda x: x + 1 with x = 2" in {
+    val expr =
+      Apply(
+        Lambda(
+          "x",
+          Add(Var("x"), Number(Num(1)))
+        ),
+        Number(Num(2))
+      )
+    eval(expr, emptyLocalScope)._1 shouldBe Some(Num(3))
+  }
+
+  it should "apply f with x = 2 if f = lambda x: x + 1" in {
+    val expr =
+      Assign("f", Lambda("x", Add(Var("x"), Number(Num(1))))) block
+        Apply(Var("f"), Number(Num(2)))
+    eval(expr, emptyLocalScope)._1 shouldBe Some(Num(3))
+  }
+
+  it should "not apply y with x = 2 if y = 3" in {
+    val expr =
+      Assign("f", Number(Num(3))) block
+        Apply(Var("f"), Number(Num(2)))
+    eval(expr, emptyLocalScope)._1 shouldBe None
+  }
 }

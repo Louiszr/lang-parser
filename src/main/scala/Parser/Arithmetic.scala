@@ -34,7 +34,7 @@ object Arithmetic {
         val res = for {
           condVal <- eval(cond, scope.passed)._1
         } yield gt(condVal, Zero)
-        res.fold[(Option[Num], Scope)]((None, scope))(b => if (b) eval(thenDo, scope.passed) else eval(elseDo, scope.passed))
+        res.fold((Option.empty[Num], scope))(b => if (b) eval(thenDo, scope.passed) else eval(elseDo, scope.passed))
       case Assign(n, v) => (None, scope.define(n, v))
       case Var(n) => scope.getOption(n)
         .map(expr => eval(expr, scope.passed))
@@ -42,6 +42,14 @@ object Arithmetic {
       case Block(first, second) =>
         val (_, scope1) = eval(first, scope.passed)
         eval(second, scope1)
+      // If we want first-class functions then eval should be able to return Lambda
+      case Lambda(_, _) => (None, scope)
+      case Apply(maybeFun, arg) => maybeFun match {
+        // Am I introducing dynamic scoping here????
+        case Lambda(argName, proc) => eval(proc, scope.passed.define(argName, arg))
+        case Var(n) => scope.getOption(n).fold((Option.empty[Num], scope))(expr => eval(Apply(expr, arg), scope))
+        case _ => (None, scope)
+      }
     }
 
     def evalEager(e: Expr, scope: Scope): (Num, Scope) = e match {
@@ -99,6 +107,13 @@ object Arithmetic {
     final case class Var(n: String) extends Expr
 
     final case class Block(first: Expr, second: Expr) extends Expr
+
+    // let x = lambda x: x + 1    Lambda("x", Add(Var("x"), Number(Num(1)))
+    // x(3)   Apply(Var("x"), Number(Num(1)))
+
+    final case class Lambda(argName: String, proc: Expr) extends Expr
+
+    final case class Apply(maybeFun: Expr, arg: Expr) extends Expr
 
   }
 
