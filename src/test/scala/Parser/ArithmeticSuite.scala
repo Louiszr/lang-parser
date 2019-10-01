@@ -91,7 +91,7 @@ class ArithmeticSuite extends FlatSpec with Matchers{
     )
   }
 
-  "eval" should "limit scope when using ShadowScope" in {
+  "eval" should "limit scope when using LocalScope" in {
     val expr =
       Assign("x", Number(Num(1))) block
         Assign("y",
@@ -100,7 +100,7 @@ class ArithmeticSuite extends FlatSpec with Matchers{
         ) block
         Add(Var("x"), Var("y"))
 
-    eval(expr, emptyLocalScope)._1 shouldBe Num(7)
+    eval(expr, emptyLocalScope)._1 shouldBe Some(Num(7))
   }
 
   "evalEager" should "use a global scope when using GlobalScope" in {

@@ -8,32 +8,37 @@ object Arithmetic {
   type Prog[A] = () => A
 
   sealed trait Expr {
-    import Expr._
 
-    // TODO: Add case for If; Fix Number case
-//    def repr: String = this match {
-//      case Number(i) => i.toString
-//      case Add(l, r) => s"(${l.repr} + ${r.repr})"
-//      case Multiply(l, r) => s"(${l.repr} * ${r.repr})"
-//    }
+    import Expr._
 
     def block(that: Expr) = Block(this, that)
   }
 
   object Expr {
-    def eval(e: Expr, scope: Scope): (Num, Scope) = e match {
+    def eval(e: Expr, scope: Scope): (Option[Num], Scope) = e match {
       // lazy local
-      case Number(i) => (i, scope)
-      case Add(l, r) => (add(eval(l, scope.passed)._1, eval(r, scope.passed)._1), scope)
-      case Multiply(l, r) => (multiply(eval(l, scope.passed)._1, eval(r, scope.passed)._1), scope)
+      case Number(i) => (Some(i), scope)
+      case Add(l, r) =>
+        val res = for {
+          lVal <- eval(l, scope.passed)._1
+          rVal <- eval(r, scope.passed)._1
+        } yield add(lVal, rVal)
+        (res, scope)
+      case Multiply(l, r) =>
+        val res = for {
+          lVal <- eval(l, scope.passed)._1
+          rVal <- eval(r, scope.passed)._1
+        } yield multiply(lVal, rVal)
+        (res, scope)
       case If(cond, thenDo, elseDo) =>
-        if (gt(eval(cond, scope.passed)._1, Zero)) eval(thenDo, scope.passed) else eval(elseDo, scope.passed)
-      // TODO: Assign should not return a Num
-      case Assign(n, v) => (Zero, scope.define(n, v))
-      // TODO: Var should return undefined
+        val res = for {
+          condVal <- eval(cond, scope.passed)._1
+        } yield gt(condVal, Zero)
+        res.fold[(Option[Num], Scope)]((None, scope))(b => if (b) eval(thenDo, scope.passed) else eval(elseDo, scope.passed))
+      case Assign(n, v) => (None, scope.define(n, v))
       case Var(n) => scope.getOption(n)
         .map(expr => eval(expr, scope.passed))
-        .getOrElse((Zero, scope))
+        .getOrElse((None, scope))
       case Block(first, second) =>
         val (_, scope1) = eval(first, scope.passed)
         eval(second, scope1)
@@ -64,36 +69,46 @@ object Arithmetic {
         evalEager(second, scope1)
     }
 
-//    def compile(e: Expr): Prog[Num] = e match {
-//      // TODO: Match not exhaustive
-//      case Number(i) => () => i
-//      case Add(l, r) =>
-//        val lComp = compile(l)
-//        val rComp = compile(r)
-//        () => add(lComp(), rComp())
-//      case Multiply(l, r) =>
-//        val lComp = compile(l)
-//        val rComp = compile(r)
-//        () => multiply(lComp(), rComp())
-//      case If(cond, thenDo, elseDo) =>
-//        val condComp = compile(cond)
-//        val thenDoComp = compile(thenDo)
-//        val elseDoComp = compile(elseDo)
-//        () => if (gt(condComp(), Zero)) thenDoComp() else elseDoComp()
-//    }
+    //    def compile(e: Expr): Prog[Num] = e match {
+    //      // Match not exhaustive
+    //      case Number(i) => () => i
+    //      case Add(l, r) =>
+    //        val lComp = compile(l)
+    //        val rComp = compile(r)
+    //        () => add(lComp(), rComp())
+    //      case Multiply(l, r) =>
+    //        val lComp = compile(l)
+    //        val rComp = compile(r)
+    //        () => multiply(lComp(), rComp())
+    //      case If(cond, thenDo, elseDo) =>
+    //        val condComp = compile(cond)
+    //        val thenDoComp = compile(thenDo)
+    //        val elseDoComp = compile(elseDo)
+    //        () => if (gt(condComp(), Zero)) thenDoComp() else elseDoComp()
+    //    }
     final case class Number(i: Num) extends Expr
+
     final case class Add(l: Expr, r: Expr) extends Expr
+
     final case class Multiply(l: Expr, r: Expr) extends Expr
+
     final case class If(cond: Expr, thenDo: Expr, elseDo: Expr) extends Expr
+
     final case class Assign(n: String, v: Expr) extends Expr
+
     final case class Var(n: String) extends Expr
+
     final case class Block(first: Expr, second: Expr) extends Expr
+
   }
 
   sealed trait Scope {
     def register: Map[String, Expr]
+
     def getOption(k: String): Option[Expr]
+
     def define(k: String, v: Expr): Scope
+
     def passed: Scope
   }
 
@@ -123,23 +138,33 @@ object Arithmetic {
   sealed trait Result[+A]
 
   object Result {
+
     final case class Success[A](a: A, remaining: String) extends Result[A]
+
     case object Failure extends Result[Nothing]
+
   }
 
 
   sealed trait Parser[A] {
+
     import Parser._
 
     def parse(s: String): Result[A]
+
     def |(that: => Parser[A]): Parser[A] = new Or(this, that)
+
     def ~[B](that: => Parser[B]): Parser[(A, B)] = new And(this, that)
+
     def map[B](f: A => B): Parser[B] = flatMap(a => Pure(f(a)))
+
     def rep: Parser[Seq[A]] = Rep(this)
+
     def flatMap[B](f: A => Parser[B]): Parser[B] = FlatMap(this, f)
   }
 
   object Parser {
+
     import Expr._
     import Result._
 
@@ -154,7 +179,7 @@ object Arithmetic {
 
     class Or[A](l: Parser[A], r: => Parser[A]) extends Parser[A] {
       override def parse(s: String): Result[A] = l.parse(s) match {
-        case s @ Success(_, _) => s
+        case s@Success(_, _) => s
         case Failure => r.parse(s)
       }
     }
@@ -183,6 +208,7 @@ object Arithmetic {
           case Success(a, remaining) => looper(a +: acc, remaining)
           case Failure => (acc, currStr)
         }
+
         looper(Seq(), s) match {
           case (Seq(), _) => Failure
           case (as, str) => Success(as.reverse, str)
@@ -214,7 +240,7 @@ object Arithmetic {
           _ <- Set(halves._2)
           resAfter <- parseAfter // res: resAfter remaining ""
         } yield (resBefore, resAfter)
-      }.parse(s)
+        }.parse(s)
     }
 
     final case class Sep(t: Char) extends Parser[(String, String)] {
@@ -243,9 +269,14 @@ object Arithmetic {
 
     val digitParser: Parser[Char] = Text('0') | Text('1') | Text('2') | Text('3') | Text('4') | Text('5') | Text('6') | Text('7') | Text('8') | Text('9')
     val numberParser: Parser[Expr] = digitParser.rep.map(chars => Number(Num(chars.map(_.toString).reduce(_ + _).toInt)))
-    def plusExprParser: Parser[Expr] = new Split(Sep('+'), exprParser, exprParser) map {case (l, r) => Add(l, r)}
-    def multiplyExprParser: Parser[Expr] = new Split(Sep('*'), exprParser, exprParser) map {case (l, r) => Multiply(l, r)}
-    def parened: Parser[Expr] = Text('(') ~ exprParser ~ Text(')') map{ case ((_, e), _) => e}
+
+    def plusExprParser: Parser[Expr] = new Split(Sep('+'), exprParser, exprParser) map { case (l, r) => Add(l, r) }
+
+    def multiplyExprParser: Parser[Expr] = new Split(Sep('*'), exprParser, exprParser) map { case (l, r) => Multiply(l, r) }
+
+    def parened: Parser[Expr] = Text('(') ~ exprParser ~ Text(')') map { case ((_, e), _) => e }
+
     def exprParser: Parser[Expr] = plusExprParser | multiplyExprParser | parened | numberParser
   }
+
 }
