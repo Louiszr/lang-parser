@@ -27,4 +27,20 @@ class NumSuite extends FlatSpec with Matchers{
   it should "say one is greater than negOne" in {
     gt(one, negOne) shouldBe true
   }
+
+  "unapply" should "give Some(0) for Zero" in {
+    unapply(Zero) shouldBe Some(0)
+  }
+
+  it should "give Some(1) for one" in {
+    unapply(one) shouldBe Some(1)
+  }
+
+  it should "give Some(-1) for negOne" in {
+    unapply(negOne) shouldBe Some(-1)
+  }
+
+  it should "give Some(-3) for Prev(Prev(negOne))" in {
+    unapply(Prev(Prev(negOne))) shouldBe Some(-3)
+  }
 }

@@ -118,7 +118,7 @@ class ArithmeticSuite extends FlatSpec with Matchers{
   "Apply" should "apply lambda x: x + 1 with x = 2" in {
     val expr =
       Apply(
-        Lambda(
+        Function1(
           "x",
           Add(Var("x"), Number(Num(1)))
         ),
@@ -129,7 +129,7 @@ class ArithmeticSuite extends FlatSpec with Matchers{
 
   it should "apply f with x = 2 if f = lambda x: x + 1" in {
     val expr =
-      Assign("f", Lambda("x", Add(Var("x"), Number(Num(1))))) block
+      Assign("f", Function1("x", Add(Var("x"), Number(Num(1))))) block
         Apply(Var("f"), Number(Num(2)))
     eval(expr, emptyLocalScope)._1 shouldBe Some(Num(3))
   }
@@ -139,5 +139,23 @@ class ArithmeticSuite extends FlatSpec with Matchers{
       Assign("f", Number(Num(3))) block
         Apply(Var("f"), Number(Num(2)))
     eval(expr, emptyLocalScope)._1 shouldBe None
+  }
+
+  it should "apply lambda x, y: x + y with x = 1, y = 2" in {
+    val func =
+      Function2(
+        "x",
+        "y",
+        Add(Var("x"), Var("y"))
+      )
+    val expr =
+      Apply(
+        Apply(
+          func,
+          Number(Num(1))
+        ),
+        Number(Num(2))
+      )
+    eval(expr, emptyLocalScope)._1 shouldBe Some(Num(3))
   }
 }

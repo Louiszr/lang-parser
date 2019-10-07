@@ -1,8 +1,12 @@
 package Parser
 
+import Parser.Arithmetic._
+
 import scala.annotation.tailrec
 
-sealed trait Num
+sealed trait Value
+
+sealed trait Num extends Value
 case object Zero extends Num
 final case class Next(before: Num) extends Num
 final case class Prev(after: Num) extends Num
@@ -10,6 +14,12 @@ final case class Prev(after: Num) extends Num
 object Num {
   def apply(i: Int): Num =
     if (i == 0) Zero else if (i > 0) Next(Num(i - 1)) else Prev(Num(i + 1))
+
+  def unapply(arg: Num): Option[Int] = arg match {
+    case Zero => Some(0)
+    case Next(b) => unapply(b).flatMap(i => Some(i + 1))
+    case Prev(a) => unapply(a).flatMap(i => Some(i - 1))
+  }
 
   val one: Num = Next(Zero)
   val negOne: Num = Prev(Zero)
@@ -65,3 +75,5 @@ object Num {
     }
   }
 }
+
+final case class Lambda(argName: String, proc: Expr) extends Value

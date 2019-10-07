@@ -15,26 +15,33 @@ object Arithmetic {
   }
 
   object Expr {
-    def eval(e: Expr, scope: Scope): (Option[Num], Scope) = e match {
+    def eval(e: Expr, scope: Scope): (Option[Value], Scope) = e match {
       // lazy local
       case Number(i) => (Some(i), scope)
       case Add(l, r) =>
-        val res = for {
-          lVal <- eval(l, scope.passed)._1
-          rVal <- eval(r, scope.passed)._1
-        } yield add(lVal, rVal)
+        val res = eval(l, scope.passed)._1 match {
+          case Some(Num(i)) => eval(r, scope.passed)._1 match {
+            case Some(Num(k)) => Some(add(Num(i), Num(k)))
+            case _ => None
+          }
+          case _ => None
+        }
         (res, scope)
       case Multiply(l, r) =>
-        val res = for {
-          lVal <- eval(l, scope.passed)._1
-          rVal <- eval(r, scope.passed)._1
-        } yield multiply(lVal, rVal)
+        val res = eval(l, scope.passed)._1 match {
+          case Some(Num(i)) => eval(r, scope.passed)._1 match {
+            case Some(Num(k)) => Some(multiply(Num(i), Num(k)))
+            case _ => None
+          }
+          case _ => None
+        }
         (res, scope)
       case If(cond, thenDo, elseDo) =>
-        val res = for {
-          condVal <- eval(cond, scope.passed)._1
-        } yield gt(condVal, Zero)
-        res.fold((Option.empty[Num], scope))(b => if (b) eval(thenDo, scope.passed) else eval(elseDo, scope.passed))
+        val res = eval(cond, scope.passed)._1 match {
+          case Some(Num(i)) => Some(gt(Num(i), Zero))
+          case _ => None
+        }
+        res.fold((Option.empty[Value], scope))(b => if (b) eval(thenDo, scope.passed) else eval(elseDo, scope.passed))
       case Assign(n, v) => (None, scope.define(n, v))
       case Var(n) => scope.getOption(n)
         .map(expr => eval(expr, scope.passed))
@@ -42,12 +49,10 @@ object Arithmetic {
       case Block(first, second) =>
         val (_, scope1) = eval(first, scope.passed)
         eval(second, scope1)
-      // If we want first-class functions then eval should be able to return Lambda
-      case Lambda(_, _) => (None, scope)
-      case Apply(maybeFun, arg) => maybeFun match {
-        // Am I introducing dynamic scoping here????
-        case Lambda(argName, proc) => eval(proc, scope.passed.define(argName, arg))
-        case Var(n) => scope.getOption(n).fold((Option.empty[Num], scope))(expr => eval(Apply(expr, arg), scope))
+      case Function1(arg1Name, proc) => (Some(Lambda(arg1Name, proc)), scope)
+      case Function2(arg1Name, arg2Name, proc) => (Some(Lambda(arg1Name, Function1(arg2Name, proc))), scope)
+      case Apply(maybeFun, arg) => eval(maybeFun, scope.passed)._1 match {
+        case Some(Lambda(arg1Name, proc)) => eval(proc, scope.passed.define(arg1Name, arg))
         case _ => (None, scope)
       }
     }
@@ -111,7 +116,9 @@ object Arithmetic {
     // let x = lambda x: x + 1    Lambda("x", Add(Var("x"), Number(Num(1)))
     // x(3)   Apply(Var("x"), Number(Num(1)))
 
-    final case class Lambda(argName: String, proc: Expr) extends Expr
+    final case class Function1(arg1Name: String, proc: Expr) extends Expr
+
+    final case class Function2(arg1Name: String, arg2Name: String, proc: Expr) extends Expr
 
     final case class Apply(maybeFun: Expr, arg: Expr) extends Expr
 
