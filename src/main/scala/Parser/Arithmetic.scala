@@ -49,12 +49,24 @@ object Arithmetic {
       case Block(first, second) =>
         val (_, scope1) = eval(first, scope.passed)
         eval(second, scope1)
-      case Function1(arg1Name, proc) => (Some(Lambda(arg1Name, proc)), scope)
-      case Function2(arg1Name, arg2Name, proc) => (Some(Lambda(arg1Name, Function1(arg2Name, proc))), scope)
-      case Apply(maybeFun, arg) => eval(maybeFun, scope.passed)._1 match {
-        case Some(Lambda(arg1Name, proc)) => eval(proc, scope.passed.define(arg1Name, arg))
-        case _ => (None, scope)
-      }
+      case Function1(arg1Name, proc) =>
+        (Some(Lambda(arg1Name, proc)), scope)
+      case Function2(arg1Name, arg2Name, proc) =>
+        (Some(Lambda(arg1Name, Function1(arg2Name, proc))), scope)
+      case Function3(arg1Name, arg2Name, arg3Name, proc) =>
+        (Some(Lambda(arg1Name, Function2(arg2Name, arg3Name, proc))), scope)
+      case Apply(maybeFun, arg) =>
+        val (value, scope1) = eval(maybeFun, scope.passed)
+        value match {
+          case Some(Lambda(arg1Name, proc)) =>
+            val argVal = eval(arg, scope.passed)._1
+            argVal match {
+              case Some(Num(i)) => eval(proc, scope1.passed.define(arg1Name, Number(Num(i))))
+              case Some(Lambda(argName, proc)) => eval(proc, scope1.passed.define(arg1Name, Function1(argName, proc)))
+              case _ => (None, scope)
+            }
+          case _ => (None, scope)
+        }
     }
 
     def evalEager(e: Expr, scope: Scope): (Num, Scope) = e match {
@@ -119,6 +131,8 @@ object Arithmetic {
     final case class Function1(arg1Name: String, proc: Expr) extends Expr
 
     final case class Function2(arg1Name: String, arg2Name: String, proc: Expr) extends Expr
+
+    final case class Function3(arg1Name: String, arg2Name: String, arg3Name: String, proc: Expr) extends Expr
 
     final case class Apply(maybeFun: Expr, arg: Expr) extends Expr
 

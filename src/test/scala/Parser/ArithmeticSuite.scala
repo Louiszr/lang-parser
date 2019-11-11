@@ -158,4 +158,85 @@ class ArithmeticSuite extends FlatSpec with Matchers{
       )
     eval(expr, emptyLocalScope)._1 shouldBe Some(Num(3))
   }
+
+  it should "apply lambda x, y, z: x + y * z with x = 1, y = 2, z = 3" in {
+    val func =
+      Function3(
+        "x",
+        "y",
+        "z",
+        Add(Var("x"), Multiply(Var("y"), Var("z")))
+      )
+    val expr =
+      Apply(
+        Apply(
+          Apply(
+            func,
+            Number(Num(1))
+          ),
+          Number(Num(2))
+        ),
+        Number(Num(3))
+      )
+    eval(expr, emptyLocalScope)._1 shouldBe Some(Num(7))
+  }
+
+  it should "do recursion" in {
+    val func =
+      Function1(
+        "x",
+        // if x > 0, return x else return f(x + 1)
+        If(Var("x"), Var("x"), Apply(Var("f"), Add(Var("x"), Number(Num(1)))))
+      )
+    val expr =
+      Assign("f", func) block
+        Apply(Var("f"), Number(Num(-2)))
+    eval(expr, emptyLocalScope)._1 shouldBe Some(Num(1))
+  }
+
+  it should "do higher-order function" in {
+    val addOne =
+      Function1(
+        "x",
+        Add(Var("x"), Number(Num(1)))
+      )
+    val modifyNumber =
+      Function2(
+        "x",
+        "f",
+        Apply(Var("f"), Var("x"))
+      )
+    val expr =
+      Apply(
+        Apply(
+          modifyNumber,
+          Number(Num(5))
+        ),
+        addOne
+      )
+    eval(expr, emptyLocalScope)._1 shouldBe Some(Num(6))
+  }
+
+  it should "do fibonacci" in {
+    val fib =
+      Function1(
+        "x",
+        If(
+          Var("x"), // if x > 0
+          If(
+            Add(Var("x"), Number(Num(-1))), // if x > 1
+            Add(
+              Apply(Var("fib"), Add(Var("x"), Number(Num(-1)))),
+              Apply(Var("fib"), Add(Var("x"), Number(Num(-2))))
+            ), // fib(x - 1) + fib(x - 2)
+            Number(Num(1)) // else when x == 1, return 1
+          ),
+          Number(Zero) // else when x <= 0, return 0
+        )
+      )
+    val expr =
+      Assign("fib", fib) block
+        Apply(Var("fib"), Number(Num(20)))
+    eval(expr, emptyLocalScope)._1 shouldBe Some(Num(6765))
+  }
 }
