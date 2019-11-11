@@ -7,8 +7,11 @@ import scala.annotation.tailrec
 sealed trait Value
 
 sealed trait Num extends Value
+
 case object Zero extends Num
+
 final case class Next(before: Num) extends Num
+
 final case class Prev(after: Num) extends Num
 
 object Num {
@@ -31,6 +34,7 @@ object Num {
       case Next(b) => looper(b, Prev(res))
       case Prev(a) => looper(a, Next(res))
     }
+
     looper(n, Zero)
   }
 
@@ -56,6 +60,7 @@ object Num {
       case Next(b) => times(b, u, add(acc, u))
       case Prev(a) => times(a, u, add(acc, inv(u)))
     }
+
     times(l, r, Zero)
   }
 

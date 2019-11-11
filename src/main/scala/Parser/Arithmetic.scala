@@ -125,9 +125,6 @@ object Arithmetic {
 
     final case class Block(first: Expr, second: Expr) extends Expr
 
-    // let x = lambda x: x + 1    Lambda("x", Add(Var("x"), Number(Num(1)))
-    // x(3)   Apply(Var("x"), Number(Num(1)))
-
     final case class Function1(arg1Name: String, proc: Expr) extends Expr
 
     final case class Function2(arg1Name: String, arg2Name: String, proc: Expr) extends Expr
