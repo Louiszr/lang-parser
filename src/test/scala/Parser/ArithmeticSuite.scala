@@ -1,10 +1,10 @@
 package Parser
 
+import Parser.Arithmetic.Expr._
+import Parser.Arithmetic.Parser._
+import Parser.Arithmetic.Result._
+import Parser.Arithmetic.Scope._
 import org.scalatest.{FlatSpec, Matchers}
-import Arithmetic.Parser._
-import Arithmetic.Result._
-import Arithmetic.Expr._
-import Arithmetic.Scope._
 
 class ArithmeticSuite extends FlatSpec with Matchers{
   "digitParser" should "parse 0" in {
@@ -238,5 +238,27 @@ class ArithmeticSuite extends FlatSpec with Matchers{
       Assign("fib", fib) block
         Apply(Var("fib"), Number(Num(20)))
     eval(expr, emptyLocalScope)._1 shouldBe Some(Num(6765))
+  }
+
+  it should "apply lambda f, x, y: f(x) + y with f = x * x, x = 2, y = 3" in {
+    val func =
+      Function3(
+        "f",
+        "x",
+        "y",
+        Add(Apply(Var("f"), Var("x")), Var("y"))
+      )
+    val expr =
+      Apply(
+        Apply(
+          Apply(
+            func,
+            Function1("x", Multiply(Var("x"), Var("x")))
+          ),
+          Number(Num(2))
+        ),
+        Number(Num(3))
+      )
+    eval(expr, emptyLocalScope)._1 shouldBe Some(Num(7))
   }
 }

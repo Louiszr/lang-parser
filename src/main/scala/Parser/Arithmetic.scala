@@ -1,6 +1,6 @@
 package Parser
 
-import Num._
+import Parser.Num._
 
 import scala.annotation.tailrec
 
@@ -49,20 +49,20 @@ object Arithmetic {
       case Block(first, second) =>
         val (_, scope1) = eval(first, scope.passed)
         eval(second, scope1)
-      case Function1(arg1Name, proc) =>
-        (Some(Lambda(arg1Name, proc)), scope)
-      case Function2(arg1Name, arg2Name, proc) =>
-        (Some(Lambda(arg1Name, Function1(arg2Name, proc))), scope)
-      case Function3(arg1Name, arg2Name, arg3Name, proc) =>
-        (Some(Lambda(arg1Name, Function2(arg2Name, arg3Name, proc))), scope)
+      case Function1(arg1Name, body) =>
+        (Some(Lambda(arg1Name, body)), scope)
+      case Function2(arg1Name, arg2Name, body) =>
+        (Some(Lambda(arg1Name, Function1(arg2Name, body))), scope)
+      case Function3(arg1Name, arg2Name, arg3Name, body) =>
+        (Some(Lambda(arg1Name, Function2(arg2Name, arg3Name, body))), scope)
       case Apply(maybeFun, arg) =>
         val (value, scope1) = eval(maybeFun, scope.passed)
         value match {
-          case Some(Lambda(arg1Name, proc)) =>
+          case Some(Lambda(arg1Name, body1)) =>
             val argVal = eval(arg, scope.passed)._1
             argVal match {
-              case Some(Num(i)) => eval(proc, scope1.passed.define(arg1Name, Number(Num(i))))
-              case Some(Lambda(argName, proc)) => eval(proc, scope1.passed.define(arg1Name, Function1(argName, proc)))
+              case Some(Num(i)) => eval(body1, scope1.passed.define(arg1Name, Number(Num(i))))
+              case Some(Lambda(argName, body)) => eval(body1, scope1.passed.define(arg1Name, Function1(argName, body)))
               case _ => (None, scope)
             }
           case _ => (None, scope)
@@ -125,11 +125,11 @@ object Arithmetic {
 
     final case class Block(first: Expr, second: Expr) extends Expr
 
-    final case class Function1(arg1Name: String, proc: Expr) extends Expr
+    final case class Function1(arg1Name: String, body: Expr) extends Expr
 
-    final case class Function2(arg1Name: String, arg2Name: String, proc: Expr) extends Expr
+    final case class Function2(arg1Name: String, arg2Name: String, body: Expr) extends Expr
 
-    final case class Function3(arg1Name: String, arg2Name: String, arg3Name: String, proc: Expr) extends Expr
+    final case class Function3(arg1Name: String, arg2Name: String, arg3Name: String, body: Expr) extends Expr
 
     final case class Apply(maybeFun: Expr, arg: Expr) extends Expr
 
